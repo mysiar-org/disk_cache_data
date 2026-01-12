@@ -1,0 +1,47 @@
+[project]
+name = "mysiar-disk-cache-data"
+version = "0.0.1"
+description = "disk_cache_data decorator"
+authors = [{ name = "Piotr Synowiec <psynowiec@gmail.com>" }]
+requires-python = ">=3.12"
+readme = "README.md"
+license = { file = "LICENSE" }
+
+# Runtime dependencies (add more as needed)
+dependencies = []
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=9.0",
+    "pytest-cov>=7.0",
+    "ruff>=0.14",
+    "mypy>=1.10",
+    "pandas>=2.0",
+    "build>=1.2",
+    "twine>=6.0",
+    "black>=25.0",
+]
+
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+package-dir = { "" = "src" }
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.ruff]
+line-length = 120
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I"]
+
+[tool.ruff.format]
+preview = true
+
+[tool.blck]
+line-length = 120
+target-version = "py312"
