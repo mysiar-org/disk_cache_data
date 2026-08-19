@@ -16,7 +16,7 @@ format:
 	./venv/bin/ruff format src tests
 
 tests::
-	source tests/env.tests.sh && ./venv/bin/pytest -vrP tests
+	source tests/env.tests.sh && ./venv/bin/pytest -vrP tests --cov=src/mysiar/disk_cache_data --cov-report=term-missing
 
 clean::
 	rm -rf dist build *.egg-info
