@@ -37,6 +37,37 @@ result = load_data(1, 2)
 result = load_data(1, 2)
 ```
 
+### Excluding an argument from the cache key
+
+An argument whose parameter name starts with an underscore is left out of the cache
+key, as in `st.cache_data`. It still reaches the function on every computed call, but
+changing it does not create a new entry. Use it for values the result does not depend
+on, or for values that are expensive or impossible to hash.
+
+The name is resolved from the function signature, so the rule applies whether the
+caller passes the argument positionally or by keyword.
+
+```python
+@disk_cache_data(ttl="30s")
+def load_data(a, _conn):
+    return _conn.query(a)
+
+load_data(1, conn_one)   # computed and cached
+load_data(1, conn_two)   # hits the entry above; conn_two is not part of the key
+```
+
+Values absorbed by a `*args` parameter have no name to test, so they are always
+hashed.
+
+Arguments are keyed by name rather than by position, so a positional call and a
+keyword call with the same values reach the same entry, and keyword order never
+matters:
+
+```python
+load_data(1, conn)             # computed and cached
+load_data(a=1, _conn=conn)     # hits the same entry
+```
+
 ### Clearing the cache of one function
 
 Each decorated function stores its entries in its own subdirectory of the namespace,

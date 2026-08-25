@@ -22,6 +22,12 @@ def multiply(a, b):
     return a * b
 
 
+@disk_cache_data(ttl="10s")
+def subtract(a, _token):
+    print("subtract-called")
+    return a - 1
+
+
 class ClearTestCase(unittest.TestCase):
     """Per function cache clearing tests."""
 
@@ -89,6 +95,24 @@ class ClearTestCase(unittest.TestCase):
         # The remaining entry is the one that was not cleared.
         self.assertEqual(add(3, 4), 7)
         self.assertEqual(self.__entries(add), 1)
+
+    def test_clear_ignores_private_args_whatever_the_call_style(self) -> None:
+        subtract(5, "token-used-at-call-time")
+        self.assertEqual(self.__entries(subtract), 1)
+
+        # A private argument is not part of the key, so clear() finds the entry
+        # with any value for it, positionally or by keyword.
+        subtract.clear(5, "a-completely-different-token")
+
+        self.assertEqual(self.__entries(subtract), 0)
+
+    def test_clear_matches_an_entry_cached_with_the_other_call_style(self) -> None:
+        add(a=1, b=2)
+        self.assertEqual(self.__entries(add), 1)
+
+        add.clear(1, 2)
+
+        self.assertEqual(self.__entries(add), 0)
 
     def test_clear_with_kwargs_ignores_keyword_order(self) -> None:
         add(a=1, b=2)

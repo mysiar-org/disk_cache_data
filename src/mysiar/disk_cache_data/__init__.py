@@ -1,5 +1,6 @@
 import functools
 import hashlib
+import inspect
 import os
 import pickle
 import re
@@ -49,10 +50,53 @@ def function_dir(func, namespace=None) -> str:
     return os.path.join(_namespace_dir(namespace), function_dir_name(func))
 
 
-def _entry_key(args, kwargs) -> str:
-    """Hash of the call arguments. Kwargs are sorted so key order cannot change it."""
-    filtered_kwargs = {k: kwargs[k] for k in sorted(kwargs) if not k.startswith("_")}
-    return hashlib.sha256(pickle.dumps((args, filtered_kwargs))).hexdigest()
+def _positional_arg_names(func) -> tuple:
+    """Parameter name of each positional slot, None where that slot has no name.
+
+    Slots filled by *args, and keyword-only parameters, have no positional name.
+    Values landing there are hashed as-is, since there is no name to test for the
+    underscore prefix. Same rule as st.cache_data.
+    """
+    try:
+        params = inspect.signature(func).parameters.values()
+    except (TypeError, ValueError):
+        # Builtins and some C callables expose no signature. Without names, every
+        # positional argument is hashed, which is the safe direction.
+        return ()
+
+    nameable = (inspect.Parameter.POSITIONAL_ONLY, inspect.Parameter.POSITIONAL_OR_KEYWORD)
+    return tuple(p.name if p.kind in nameable else None for p in params)
+
+
+def _entry_key(positional_names, args, kwargs) -> str:
+    """Hash of the call arguments.
+
+    An argument whose parameter name starts with an underscore is left out of the
+    key, as in st.cache_data: it still reaches the function, but changing it does
+    not mint a new entry. Positional arguments are resolved to their parameter
+    name first, so the exclusion holds whether the caller passes them
+    positionally or by keyword, and both call styles reach the same entry.
+
+    Named arguments are sorted by name, so keyword order cannot change the key.
+    Values with no name keep their positional order, which is all that identifies
+    them.
+    """
+    named = {}
+    unnamed = []
+
+    for index, value in enumerate(args):
+        name = positional_names[index] if index < len(positional_names) else None
+        if name is None:
+            unnamed.append(value)
+        elif not name.startswith("_"):
+            named[name] = value
+
+    for name, value in kwargs.items():
+        if not name.startswith("_"):
+            named[name] = value
+
+    payload = ([(name, named[name]) for name in sorted(named)], unnamed)
+    return hashlib.sha256(pickle.dumps(payload)).hexdigest()
 
 
 def _mtime(path) -> float:
@@ -99,6 +143,10 @@ def disk_cache_data(ttl=None):
     """
 
     def decorator(func):
+        # Resolved once here rather than per call: inspect.signature is not cheap
+        # enough for a hot path, and the signature cannot change afterwards.
+        positional_names = _positional_arg_names(func)
+
         @functools.wraps(func)
         def wrapper(*args, **kwargs):
             # ---- 0. Global disable ----
@@ -119,7 +167,7 @@ def disk_cache_data(ttl=None):
             effective_ttl = parse_ttl(ttl)
 
             # ---- 2. Locate entry inside the directory of this function ----
-            key_hash = _entry_key(args, kwargs)
+            key_hash = _entry_key(positional_names, args, kwargs)
             fn_dir = function_dir(func)
             os.makedirs(fn_dir, exist_ok=True)
 
@@ -187,7 +235,7 @@ def disk_cache_data(ttl=None):
             fn_dir = function_dir(func)
 
             if args or kwargs:
-                key_hash = _entry_key(args, kwargs)
+                key_hash = _entry_key(positional_names, args, kwargs)
                 with _disk_lock:
                     safe_delete(os.path.join(fn_dir, f"{key_hash}.pkl"))
                     safe_delete(os.path.join(fn_dir, f"{key_hash}.meta"))
