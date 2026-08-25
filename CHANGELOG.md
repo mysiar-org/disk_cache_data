@@ -5,7 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/) and this project adheres
 to [Semantic Versioning](http://semver.org/spec/v2.0.0.html).
 
-## [0.2.0] - unreleased
+## [0.3.0] - 2026-08-25
+
+### Added
+
+- Support for Python 3.10 and 3.11. `requires-python` drops from `>=3.12` to `>=3.10`, and the test
+  workflow runs the suite on 3.10, 3.11, 3.12 and 3.13.
+
+## [0.2.0] - 2026-08-25
 
 ### Added
 

@@ -1,9 +1,9 @@
 [project]
 name = "mysiar-disk-cache-data"
-version = "0.2.0"
+version = "0.3.0"
 description = "disk_cache_data decorator"
 authors = [{ name = "Piotr Synowiec <psynowiec@gmail.com>" }]
-requires-python = ">=3.10"
+requires-python = ">=3.9"
 readme = "README.md"
 license = { file = "LICENSE" }
 
