@@ -1,0 +1,42 @@
+name: tests
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+# One run per ref: a new push cancels the run still in flight for the same branch.
+concurrency:
+  group: tests-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.12", "3.13"]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+          cache-dependency-path: pyproject.toml
+
+      - name: Install package with dev extras
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e .[dev]
+
+      - name: Lint
+        run: ruff check src tests
+
+      - name: Tests
+        # DISK_CACHE_DIR is read at import time, so the env must be set before pytest starts.
+        run: |
+          source tests/env.tests.sh
+          pytest -vrP tests --cov=src/mysiar/disk_cache_data --cov-report=term-missing
