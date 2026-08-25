@@ -44,6 +44,18 @@ def load_data_private_kwargs(a, _token=None):
     return (a, _token)
 
 
+@disk_cache_data(ttl="10s")
+def load_data_private_positional(a, _token):
+    print("function-private-positional")
+    return (a, _token)
+
+
+@disk_cache_data(ttl="10s")
+def load_data_private_star_args(a, *rest):
+    print("function-private-star")
+    return (a, rest)
+
+
 def _decorated_from_module(module_name):
     """Build a decorated function whose qualified name is shared across modules."""
 
@@ -249,6 +261,36 @@ class DiskCacheDataBehaviourTestCase(unittest.TestCase):
         self.assertEqual(second, (1, "first"))
         self.assertEqual(self.__calls(mock_stdout, "function-private"), 1)
         self.assertEqual(self.__entries(load_data_private_kwargs), 1)
+
+    @patch("sys.stdout", new_callable=io.StringIO)
+    def test_private_args_are_kept_out_of_the_key_when_passed_positionally(self, mock_stdout) -> None:
+        first = load_data_private_positional(1, "first")
+        second = load_data_private_positional(1, "second")
+
+        # The name is resolved from the signature, so the underscore rule applies
+        # to a positional argument exactly as it does to a keyword one.
+        self.assertEqual(first, (1, "first"))
+        self.assertEqual(second, (1, "first"))
+        self.assertEqual(self.__calls(mock_stdout, "function-private-positional"), 1)
+        self.assertEqual(self.__entries(load_data_private_positional), 1)
+
+    @patch("sys.stdout", new_callable=io.StringIO)
+    def test_positional_and_keyword_calls_share_one_entry(self, mock_stdout) -> None:
+        self.assertEqual(load_data(1, 2), 3)
+        self.assertEqual(load_data(a=1, b=2), 3)
+        self.assertEqual(load_data(1, b=2), 3)
+
+        self.assertEqual(self.__calls(mock_stdout, "function"), 1)
+        self.assertEqual(self.__entries(load_data), 1)
+
+    @patch("sys.stdout", new_callable=io.StringIO)
+    def test_values_absorbed_by_star_args_stay_in_the_key(self, mock_stdout) -> None:
+        # A *args slot has no parameter name to test, so its values are hashed.
+        self.assertEqual(load_data_private_star_args(1, "x"), (1, ("x",)))
+        self.assertEqual(load_data_private_star_args(1, "y"), (1, ("y",)))
+
+        self.assertEqual(self.__calls(mock_stdout, "function-private-star"), 2)
+        self.assertEqual(self.__entries(load_data_private_star_args), 2)
 
     @patch("sys.stdout", new_callable=io.StringIO)
     def test_expired_entry_is_recomputed_and_replaced(self, mock_stdout) -> None:
